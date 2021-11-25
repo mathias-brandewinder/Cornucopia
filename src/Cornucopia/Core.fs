@@ -7,7 +7,21 @@ type Distribution<'T> =
     | Flat of 'T []
     | Weighted of (float * 'T) []
 
+type Name = | Name of string
+
+type Expr =
+    | Source of Name
+    | Or of list<float * Expr>
+    | Maybe of (float * Expr)
+
+type Context = {
+    Sources: Map<Name, Distribution<string>>
+    }
+
 type Picker (rng: Random) =
+
+    member this.Roll () =
+        rng.NextDouble ()
 
     member this.Uniform<'T> (distribution: 'T []) =
         if distribution |> Array.isEmpty
@@ -61,15 +75,25 @@ type Picker (rng: Random) =
 module Pick =
 
     let picker = Random() |> Picker
+
     /// Pick a random element directly from a source distribution.
-    let from (rng: Random) (source: Distribution<'T>) =
+    let fromSource (source: Distribution<'T>) =
         match source with
         | Flat source -> picker.Uniform source
         | Weighted source -> picker.Weighted source
 
-type Name = | Name of string
+    let rec from (context: Context) (exp: Expr) =
 
-type Expr =
-    | Source of Name
-    | Or of list<float * Expr>
-    | Maybe of (float * Expr)
+        match exp with
+        | Source name ->
+            context.Sources
+            |> Map.tryFind name
+            |> Option.bind fromSource
+        | Or choices ->
+            choices
+            |> picker.Weighted
+            |> Option.bind (from context)
+        | Maybe (proba, expr) ->
+            if picker.Roll () <= proba
+            then None
+            else from context expr
