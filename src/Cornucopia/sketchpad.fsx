@@ -28,11 +28,16 @@ let context = {
         |> Map.ofList
     }
 
-let expr =
+let def =
     Or [
         0.4, Source (Name "source 1")
         0.6, Maybe (0.5, Source (Name "source 2"))
         ]
 
-expr
-|> Pick.from context
+let picker = Select(context, System.Random())
+
+def
+|> picker.OneOf
+
+def
+|> picker.MaybeOne

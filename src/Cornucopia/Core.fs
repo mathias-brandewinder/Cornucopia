@@ -2,21 +2,10 @@
 
 open System
 
-/// Some list of items, with or without weights
+/// Set of items, with or without weights
 type Distribution<'T> =
     | Flat of 'T []
     | Weighted of (float * 'T) []
-
-type Name = | Name of string
-
-type Expr =
-    | Source of Name
-    | Or of list<float * Expr>
-    | Maybe of (float * Expr)
-
-type Context = {
-    Sources: Map<Name, Distribution<string>>
-    }
 
 type Picker (rng: Random) =
 
@@ -72,28 +61,60 @@ type Picker (rng: Random) =
                     else search acc rest
             search 0.0 distribution
 
-module Pick =
-
-    let picker = Random() |> Picker
-
     /// Pick a random element directly from a source distribution.
-    let fromSource (source: Distribution<'T>) =
+    member this.FromSource (source: Distribution<'T>) =
         match source with
-        | Flat source -> picker.Uniform source
-        | Weighted source -> picker.Weighted source
+        | Flat source -> this.Uniform source
+        | Weighted source -> this.Weighted source
 
-    let rec from (context: Context) (exp: Expr) =
+type Name = | Name of string
 
-        match exp with
+type Context = {
+    Sources: Map<Name, Distribution<string>>
+    }
+
+type Attribute = {
+    Tag: string
+    Value: string
+    }
+
+type Definition<'T> =
+    | Source of Name
+    | Def of Name * Definition<'T>
+    | Or of list<float * Definition<'T>>
+    | Maybe of float * Definition<'T>
+
+type Select (context: Context, rng: Random) =
+
+    let picker = Picker rng
+
+    member this.OneOf (def: Definition<'T>) =
+        match def with
         | Source name ->
             context.Sources
             |> Map.tryFind name
-            |> Option.bind fromSource
+            |> Option.bind (picker.FromSource)
+        | Def (name, definition) ->
+            this.OneOf definition
         | Or choices ->
-            choices
-            |> picker.Weighted
-            |> Option.bind (from context)
-        | Maybe (proba, expr) ->
+            picker.Weighted choices
+            |> Option.bind this.OneOf
+        | Maybe (_, choice) ->
+            this.OneOf choice
+
+    member this.MaybeOne (def: Definition<'T>) =
+        match def with
+        | Source name ->
+            context.Sources
+            |> Map.tryFind name
+            |> Option.bind (picker.FromSource)
+        | Def (_, definition) ->
+            this.MaybeOne definition
+        | Or choices ->
+            picker.Weighted choices
+            |> Option.bind this.MaybeOne
+        | Maybe (proba, choice) ->
             if picker.Roll () <= proba
             then None
-            else from context expr
+            else
+                this.OneOf choice
