@@ -11,13 +11,13 @@ type Weight =
         this
         |> function | W w -> w
 
-type Table<'T> =
-    | Flat of list<'T>
+type Distribution<'T> =
+    | Uniform of list<'T>
     | Weighted of list<Weight * 'T>
     with
     member this.Length =
         match this with
-        | Flat xs -> xs.Length
+        | Uniform xs -> xs.Length
         | Weighted xs -> xs.Length
 
 module Pick =
@@ -26,13 +26,13 @@ module Pick =
 
     let weight (i: int) = Weight.create i
 
-    let flat (rng: Random) (table: List<_>) =
-        let i = rng.Next(0, table.Length)
-        table.[i]
+    let uniform (rng: Random) (uniform: List<_>) =
+        let i = rng.Next(0, uniform.Length)
+        uniform.[i]
 
-    let weighted (rng: Random) (table: list<Weight * _>) =
+    let weighted (rng: Random) (weighted: list<Weight * _>) =
         let total =
-            table
+            weighted
             |> List.sumBy (fun (w, _) -> w.Value)
         let roll = rng.Next (0, total) + 1
         let rec search acc (entries: list<Weight * _>) =
@@ -43,9 +43,9 @@ module Pick =
                 if acc >= roll
                 then value
                 else search acc tl
-        search 0 table
+        search 0 weighted
 
-    let from (rng: Random) (table: Table<_>) =
-        match table with
-        | Flat table -> flat rng table
-        | Weighted table -> weighted rng table
+    let from (rng: Random) (distribution: Distribution<_>) =
+        match distribution with
+        | Uniform distribution -> uniform rng distribution
+        | Weighted distribution -> weighted rng distribution
