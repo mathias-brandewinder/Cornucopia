@@ -34,7 +34,7 @@ module Pick =
         let total =
             table
             |> List.sumBy (fun (w, _) -> w.Value)
-        let roll = rng.Next (0, total)
+        let roll = rng.Next (0, total) + 1
         let rec search acc (entries: list<Weight * _>) =
             match entries with
             | [] -> failwith "no entry to pick from table"
